@@ -1,4 +1,4 @@
-workbook: file:///home/jovyan/work/semantic_interop_story/Inhibitor_Data_Analysis_summary.xlsx
+workbook: ./Inhibitor_Data_Analysis_summary.xlsx
 sheet: data
 data_range: "A3:G80"
 data:

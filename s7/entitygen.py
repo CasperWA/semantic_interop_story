@@ -1,10 +1,14 @@
-class BaseExt:
-    """
-    Base class
-    """
+"""Generate SOFT7 entities based on basic information:
 
-    def __init__(self):
-        pass
+1. Data source (DB, File, Webpage, ...)
+2. Generic data source parser
+3. Data source parser configuration
+4. SOFT7 entity data model.
+
+Parts 2 and 3 are together considered to produce the "specific parser" and are provided
+through a single dictionary based on the `ResourceConfig` from `oteapi.models`.
+
+"""
 
 
 def __dataspace_class_factory(name, data):
