@@ -1,0 +1,39 @@
+identity: http://onto-ns.com/s7/entity/0/Entity#55e30bda-0797-47ef-a0bf-ecd4e641acf1
+description: Inhibitor data
+dimensions:
+    N : Number of elemements
+properties:
+    sampleType:            
+        type: string
+        description: Molecule name
+        shape: ["N"]            
+        
+    casNumber:            
+        type: string
+        shape: ["N"]
+        description: CAS number
+        
+    runID:
+        type: string
+        shape: ["N"]
+        description: Experiment identification
+    
+    inhibitorEfficiency:
+        type: float
+        shape: ["N"]
+        description: EIS 24h
+        
+    impedance_log_24h:
+        type: float
+        shape: ["N"]
+        description: Impedance Log (24h)
+        
+    impedance_ohm_24h:
+        type: float
+        shape: ["N"]
+        description: Impedance Ohm (24h)
+        
+    impedance_kohm_24h:
+        type: float
+        shape: ["N"]
+        description: Impedance kOhm (24h)

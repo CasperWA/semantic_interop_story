@@ -1,0 +1,46 @@
+workbook: file:///home/jovyan/work/semantic_interop_story/Inhibitor_Data_Analysis_summary.xlsx
+sheet: data
+data_range: "A3:G80"
+data:
+    sampleType:
+        header: "A2"
+        range: "A3:A30"
+        type: string
+        regexp: "\\W*"
+        unique: True
+    
+    casNumber:
+        header: "B2"
+        range: "B3:B30"
+        type: string
+        regexp: "\\d+\\-\\d+\\-\\d+"
+  
+    runID:
+        header: "C2"
+        range: "C3:C30"
+        type: string
+        regexp: "\\W*"
+
+    inhibitorEfficiency:
+        header: "G3"
+        range: "G3:G30"
+        type: float
+        regexp: "[-+]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?"
+        
+    impedance_log_24h:
+        header: "D2"
+        range: "D3:D30"
+        type: float
+        regexp: "[-+]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?"
+        
+    impedance_ohm_24h:
+        header: "E2"
+        range: "E3:E30"
+        type: float
+        regexp: "[-+]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?"
+
+    impedance_kohm_24h:
+        header: "F2"
+        range: "F3:F30"
+        type: float
+        regexp: "[-+]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?"
