@@ -81,29 +81,27 @@ def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] 
     raise AttributeError(f"{name!r} could not be determined")
 
 
-_FUNCTION_MAPPING = {}
-
 def _get_property_local(
-    name: str,
     graph: Graph,
 ) -> Any:
     """Get a property - local."""
-    global _FUNCTION_MAPPING
-
-    if _FUNCTION_MAPPING and name in _FUNCTION_MAPPING:
-        return _FUNCTION_MAPPING[name]
-    if _FUNCTION_MAPPING:
-        raise ValueError(f"Could find no data for {name!r}")
-
     # Not found in cache - go get property
-    path = graph.path("")
+    # path = graph.path("")
 
+    _temp_results = {
+        "SMILES": [function_ for _, _, function_ in graph.match(s="cas_to_smiles", p="executes")][0],
+        "inhibitorEfficiency": [function_ for _, _, function_ in graph.match(s="imp_to_flux", p="executes")][0]
+    }
+    _temp_paths = {
+        "SMILES": ["SMILES", "cas_to_smiles", "CAS#", "inner.casNumber"],
+        "inhibitorEfficiency": ["EISEfficiency", "imp_to_flux", "ImpedanceOhm", "inner.impedance_ohm_24h"],
+    }
 
-    # _FUNCTION_MAPPING = parser.get()
-    if name in _FUNCTION_MAPPING:
-        return _FUNCTION_MAPPING[name]
+    def __get_property(name: str):
+        input_ = [function_ for _, _, function_ in graph.match(s=_temp_paths[name][-1], p="get")][0]
+        return _temp_results[name](input_(_temp_paths[name][-1].split(".")[-1]))
 
-    raise ValueError(f"Could find no data for {name!r}")
+    return __get_property
 
 
 def create_outer_entity(
@@ -147,33 +145,35 @@ def create_outer_entity(
         )
 
     # Create "complete" local graph
-    local_graph = Graph(
-        [
-            ("inner", "isA", "DataSourceEntity"),
-            ("outer", "isA", "OuterEntity"),
-            ("DataSourceEntity", "isA", "SOFT7DataEntity"),
-            ("OuterEntity", "isA", "SOFT7DataEntity"),
-        ]
-    )
+    # local_graph = Graph(
+    #     [
+    #         ("inner", "isA", "DataSourceEntity"),
+    #         ("outer", "isA", "OuterEntity"),
+    #         ("DataSourceEntity", "isA", "SOFT7DataEntity"),
+    #         ("OuterEntity", "isA", "SOFT7DataEntity"),
+    #     ]
+    # )
+    local_graph = Graph()
     for s, _, _ in mapping.triples:
         split_subject = s.split(".")
-        local_graph.append(
-            (split_subject[0], "hasProperty", split_subject[1])
-        )
+        if split_subject[0] == "inner":
+            local_graph.append(
+                (s, "get", lambda name: getattr(inner_entity, name))
+            )
 
     for triple in TEST_KNOWLEDGE_BASE.triples:
         local_graph.append(triple)
 
     # Generate lambda functions for properties
-    functions: list[str] = [
-        function_name for function_name, _, _ in mapping.match(p="isA", o="function")
-    ]
-    for function_name in functions:
+    # functions: list[str] = [
+    #     function_name for function_name, _, _ in mapping.match(p="isA", o="function")
+    # ]
+    for function_name, _, _ in local_graph.match(p="isA", o="function"):
         missing_functions = []
         if not hasattr(known_functions, function_name):
             missing_functions.append(function_name)
         else:
-            mapping.append(
+            local_graph.append(
                 (
                     function_name,
                     "executes",
@@ -191,7 +191,7 @@ def create_outer_entity(
             property_name: (
                 SOFT7EntityPropertyType(property_value.get("type", "")).py_cls,
                 Field(
-                    default_factory=lambda: lambda: _get_property_local(property_name, local_graph),
+                    default_factory=lambda: _get_property_local(local_graph),
                     description=property_value.get("description", ""),
                     title=property_name.replace(" ", "_"),
                     type=SOFT7EntityPropertyType(property_value.get("type", "")).py_cls,

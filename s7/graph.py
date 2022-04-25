@@ -1,16 +1,16 @@
 from collections import defaultdict
 import types
-from typing import Tuple, List, Any
-from pydantic.dataclasses import dataclass
+from typing import Tuple, List, Any, Optional
 from rdflib import Graph as RDFGraph
 from graphviz import Digraph
 
 NTuple = Tuple[Any, ...]
 
 
-@dataclass
 class Graph:
-    triples: List[Tuple[Any, ...]]
+
+    def __init__(self, triples: Optional[List[Tuple[Any, Any, Any]]] = None) -> None:
+        self.triples: List[Tuple[Any, Any, Any]] = triples or []
 
     def clear(self):
         self.triples.clear()

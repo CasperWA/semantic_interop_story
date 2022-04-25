@@ -14,12 +14,11 @@ from enum import Enum
 from functools import lru_cache
 import json
 from pathlib import Path
-from types import FunctionType
 from typing import Any, Optional, Union
 
 from oteapi.models import ResourceConfig
 from otelib import OTEClient
-from pydantic import BaseModel, create_model, Field
+from pydantic import create_model, Field
 import yaml
 
 from .models import SOFT7DataEntity
@@ -67,11 +66,9 @@ def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] 
         return result[name]
     raise AttributeError(f"{name!r} could not be determined")
 
-
 _CACHE = {}
 
 def _get_property_local(
-    name: str,
     config: HashableResourceConfig,
 ) -> Any:
     """Get a property - local."""
@@ -79,31 +76,15 @@ def _get_property_local(
 
     global _CACHE
 
-    if _CACHE and name in _CACHE:
-        return _CACHE[name]
-    if _CACHE:
+    if not _CACHE:
+        _CACHE = XLSParser(config.configuration).get()
+
+    def __get_property_local(name: str):
+        if name in _CACHE:
+            return _CACHE[name]
+
         raise ValueError(f"Could find no data for {name!r}")
-
-    parser = XLSParser(config.configuration)
-    _CACHE = parser.get()
-    if name in _CACHE:
-        return _CACHE[name]
-
-    raise ValueError(f"Could find no data for {name!r}")
-
-
-def __getattribute(self, name: str) -> Any:
-    """Get an attribute.
-
-    This function will _always_ be called whenever an attribute is accessed.
-    """
-    try:
-        res = object.__getattribute__(self, name)
-        if not name.startswith("_") and isinstance(res, FunctionType):
-            return res()
-        return res
-    except Exception as exc:
-        raise AttributeError from exc
+    return __get_property_local
 
 
 def create_entity(
@@ -145,13 +126,14 @@ def create_entity(
             "data model property names may not start with an underscore (_)"
         )
 
-    return create_model(
+    DataSourceEntity = create_model(
         "DataSourceEntity",
         **{
             property_name: (
                 SOFT7EntityPropertyType(property_value.get("type", "")).py_cls,
                 Field(
-                    default_factory=lambda: lambda: _get_property_local(property_name, resource_config),
+                    # None,
+                    default_factory=lambda: _get_property_local(resource_config),
                     description=property_value.get("description", ""),
                     title=property_name.replace(" ", "_"),
                     type=SOFT7EntityPropertyType(property_value.get("type", "")).py_cls,
@@ -161,3 +143,5 @@ def create_entity(
         __module__ = __name__,
         __base__ = SOFT7DataEntity,
     )
+    # DataSourceEntity._attrfunction = _get_property_local(resource_config)
+    return DataSourceEntity

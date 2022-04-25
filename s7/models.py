@@ -1,9 +1,9 @@
 """Generic data model for configuration attributes."""
 from pathlib import Path
 from types import FunctionType
-from typing import Any, Optional, Union
+from typing import Any, ClassVar, Optional, Union
 
-from pydantic import BaseModel, FileUrl, create_model, validator
+from pydantic import BaseModel, FileUrl, create_model, validator, PrivateAttr
 import yaml
 
 
@@ -54,8 +54,9 @@ class SOFT7DataEntity(BaseModel):
         """
         try:
             res = object.__getattribute__(self, name)
-            if not name.startswith("_") and isinstance(res, FunctionType):
-                return res()
+            if not name.startswith("_"):
+                if name in object.__getattribute__(self, "__fields__"):
+                    return res(name)
             return res
         except Exception as exc:
             raise AttributeError from exc
