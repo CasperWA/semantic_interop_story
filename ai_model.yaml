@@ -1,0 +1,14 @@
+identity: http://onto-ns.com/s7/entity/0/Entity#4ef6aca0-6b42-4f2a-acc9-36523d2338f4
+description: AI model
+dimensions:
+  N: Number of elements
+properties:
+  SMILES:
+    type: string
+    shape: ["N"]
+    description: SMILES
+
+  inhibitorEfficiency:
+    type: float
+    shape: ["N"]
+    description: EIS 24h

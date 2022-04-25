@@ -16,7 +16,7 @@ def __dataspace_class_factory(name, data):
     attr = dict(__init__=initializer, set_property=generic_setter)
 
     gen_dataspace_getset = lambda mem: lambda key: lambda: property(
-        lambda self: mem[key] if key in mem else None,
+        lambda self: mem.get(key, None),
         lambda self, value: (mem.update({key: value})),
     )
 

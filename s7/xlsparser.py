@@ -4,14 +4,35 @@ from openpyxl.worksheet.cell_range import CellRange
 from itertools import product
 import numpy as np
 import re
-
 from .models import Workbook
+
+
+allowed_types = {
+    'string': str,
+    'float': float,
+    'complex': complex,
+    'int': int,
+    'dict': dict,
+    'boolean': bool,
+    'bytes': bytes,
+    'bytearray': bytearray
+}
+
+
+def validate_data(tup):
+    rexp, typ, val = tup
+    if val == None or not isinstance(val, typ):
+        return False
+    if rexp:
+        val = bool(re.match(rexp, val))
+        return val
+    return True
 
 
 @dataclass
 class XLSParser:
-    """Parse excel documents given document configuration
-    and an S7-entity
+    """ Parse excel documents given document configuration
+        and an S7-entity
     """
 
     xls_model: Workbook
@@ -22,33 +43,32 @@ class XLSParser:
 
         alldata = {}
         redata = {}
+        typedata = {}
         for d in self.xls_model.data:
             item = []
-            dataRange = CellRange(self.xls_model.data_range)
+            dataRange = CellRange(str(self.xls_model.data_range))
             cellRange = dataRange.intersection(CellRange(d[1].range))
             for cell in product(
-                range(cellRange.min_row, cellRange.max_row + 1),
-                range(cellRange.min_col, cellRange.max_col + 1),
+                range(cellRange.min_row, cellRange.max_row+1),
+                range(cellRange.min_col, cellRange.max_col+1)
             ):
-                cell_obj = sheet_obj.cell(*cell)
-                v = str(cell_obj.value)
-                if d[1].type == "float":
-                    try:
-                        item.append(float(v))
-                        # print ("added ", float(v))
-                    except ValueError:
-                        item.append(v)
-                else:
-                    item.append(v)
+                cell_obj = sheet_obj.cell(*cell)        
+                item.append(cell_obj.value)
+            idx=d[0]
+            prop=d[1]
+            alldata[idx] = item
+            redata[idx] = prop.regexp
+            typedata[idx] = allowed_types[prop.type]
 
-            alldata[d[0]] = item
-            redata[d[0]] = d[1].regexp
-
-        newdata = {}
-        for elem in np.column_stack([alldata[label] for label in alldata.keys()]):
-            l = list(zip([redata[label] for label in alldata.keys()], elem))
-            if not False in [bool(re.match(*s)) for s in l]:
-                for (k, v) in list(zip(alldata.keys(), elem)):
+        newdata = {}       
+        for elem in np.column_stack(
+            [alldata[label] for label in alldata.keys()]
+        ):
+            tuples = list(zip([redata[label] for label in alldata.keys()],
+                         [typedata[label] for label in alldata.keys()],
+                         elem))
+            if not False in [validate_data(tup) for tup in tuples]:
+                for (k,v) in (list(zip(alldata.keys(), elem))):
                     if not k in newdata:
                         newdata[k] = []
                     newdata[k].append(v)
