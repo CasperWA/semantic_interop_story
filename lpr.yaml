@@ -1,5 +1,5 @@
-identity: http://onto-ns.com/s7/entity/0/Entity#55e30bda-0797-47ef-a0bf-ecd4e641acf1
-description: Inhibitor data
+identity: http://onto-ns.com/s7/entity/0/Entity#e2fe9fea-51d5-4679-81c2-cc69f4e0e049
+description: Linear Polarization Resistance (LPR) data
 dimensions:
   N: Number of elements
 properties:
@@ -21,8 +21,8 @@ properties:
     description: Experiment identification
     unit: null
 
-  impedance_log_24h:
-    type: float
+  lpr_24h:
+    type: int
     shape: ["N"]
-    description: Impedance Log (24h)
-    unit: log(Ohm)
+    description: LPR (24h)
+    unit: Ohm

@@ -43,6 +43,7 @@ class SOFT7EntityPropertyType(str, Enum):
 
     STR = "string"
     FLOAT = "float"
+    INT = "int"
 
     @property
     def py_cls(self) -> type:
@@ -50,6 +51,7 @@ class SOFT7EntityPropertyType(str, Enum):
         return {
             self.STR: str,
             self.FLOAT: float,
+            self.INT: int,
         }[self]
 
 
@@ -66,7 +68,7 @@ def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] 
         return result[name]
     raise AttributeError(f"{name!r} could not be determined")
 
-_CACHE = {}
+# _CACHE = {}
 
 def _get_property_local(
     config: HashableResourceConfig,
@@ -74,10 +76,12 @@ def _get_property_local(
     """Get a property - local."""
     from s7.xlsparser import XLSParser
 
-    global _CACHE
+    # global _CACHE
 
-    if not _CACHE:
-        _CACHE = XLSParser(config.configuration).get()
+    # if not _CACHE:
+    #     _CACHE = XLSParser(config.configuration).get()
+
+    _CACHE = XLSParser(config.configuration).get()
 
     def __get_property_local(name: str):
         if name in _CACHE:
@@ -126,7 +130,7 @@ def create_entity(
             "data model property names may not start with an underscore (_)"
         )
 
-    DataSourceEntity = create_model(
+    return create_model(
         "DataSourceEntity",
         **{
             property_name: (
@@ -137,11 +141,10 @@ def create_entity(
                     description=property_value.get("description", ""),
                     title=property_name.replace(" ", "_"),
                     type=SOFT7EntityPropertyType(property_value.get("type", "")).py_cls,
+                    unit=property_value.get("unit", None),
                 )
             ) for property_name, property_value in data_model.get("properties", {}).items()
         },
         __module__ = __name__,
         __base__ = SOFT7DataEntity,
     )
-    # DataSourceEntity._attrfunction = _get_property_local(resource_config)
-    return DataSourceEntity

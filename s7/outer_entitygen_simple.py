@@ -22,23 +22,42 @@ from .graph import Graph
 TEST_KNOWLEDGE_BASE = Graph(
     [
         ("imp_to_eis", "isA", "function"),
-        ("imp_to_eis", "expects", "ImpedanceOhm"),
+        ("imp_to_eis", "expects", "ImpedancekOhmCm2"),
         ("imp_to_eis", "outputs", "EISEfficiency"),
+
         ("imp_to_lpr", "isA", "function"),
-        ("imp_to_lpr", "expects", "ImpedanceLogOhm"),
+        ("imp_to_lpr", "expects", "LPR24h"),
         ("imp_to_lpr", "outputs", "LPREfficiency"),
-        ("imp_log_func", "isA", "function"),
-        ("imp_log_func", "expects", "ImpedanceOhm"),
-        ("imp_log_func", "outputs", "ImpedanceLogOhm"),
-        ("ImpedanceOhm", "isA", "Resistance"),
-        ("ImpedanceLogOhm", "isA", "Resistance"),
-        ("EISEfficiency", "isA", "InhibitorEfficiency"),
-        ("LPREfficiency", "isA", "InhibitorEfficiency"),
-        ("Resistance", "isA", "Parameter"),
-        ("InhibitorEfficiency", "isA", "Output"),
+
+        ("imp_pow_func", "isA", "function"),
+        ("imp_pow_func", "expects", "ImpedanceLogOhm"),
+        ("imp_pow_func", "outputs", "ImpedanceOhm"),
+
+        ("impkflux", "isA", "function"),
+        ("impkflux", "expects", "ImpedanceOhm"),
+        ("impkflux", "outputs", "ImpedancekOhmCm2"),
+
         ("cas_to_smiles", "isA", "function"),
         ("cas_to_smiles", "expects", "CASNumber"),
         ("cas_to_smiles", "outputs", "SMILES"),
+
+        ("cas_to_inchi", "isA", "function"),
+        ("cas_to_inchi", "expects", "CASNumber"),
+        ("cas_to_inchi", "outputs", "InChI"),
+
+        # ("cas_to_cas", "isA", "function"),
+        # ("cas_to_cas", "expects", "CASNumber"),
+        # ("cas_to_cas", "outputs", "CASNumber"),
+
+        ("LPR24h", "isA", "Resistance"),
+        ("ImpedanceOhm", "isA", "Resistance"),
+        ("ImpedanceLogOhm", "isA", "Resistance"),
+        ("ImpedancekOhmCm2", "isA", "Resistance"),
+        ("EISEfficiency", "isA", "InhibitorEfficiency"),
+        ("LPREfficiency", "isA", "InhibitorEfficiency"),
+        ("PDPEfficiency", "isA", "InhibitorEfficiency"),
+        ("Resistance", "isA", "Parameter"),
+        ("InhibitorEfficiency", "isA", "Output"),
     ]
 )
 
@@ -122,7 +141,7 @@ def _get_property_local(
 
     def __get_property(name: str) -> Any:
         path = graph.path(f"outer.{name}", "inner", predicate_filter, node_filter)
-        print(path)
+        print("Graph traversed! Path:", " -> ".join(path[0]))
         if len(path) > 1:
             raise RuntimeError("Found more than one path through the graph !")
         path = path[0]
@@ -134,7 +153,7 @@ def _get_property_local(
         # print(functions)
 
         if not functions:
-            raise RuntimeError(f"No function found to retrieve {name!r}")
+            raise RuntimeError(f"No function found to retrieve {name!r} - what a stupid path")
 
         functions_dict: dict[str, dict[str, Any]] = {}
         for function_name in functions:

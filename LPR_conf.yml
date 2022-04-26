@@ -1,0 +1,31 @@
+workbook: ./Inhibitor_Data_Analysis_summary.xlsx
+sheet: data
+data_range: "A3:AE80"
+data:
+  sampleType:
+    header: "A2"
+    range: "A3:A30"
+    type: string
+    regexp: "\\W*"
+    unique: True
+    unit: null
+
+  casNumber:
+    header: "B2"
+    range: "B3:B30"
+    type: string
+    regexp: "\\d+\\-\\d+\\-\\d+"
+    unit: null
+
+  runID:
+    header: "C2"
+    range: "C3:C30"
+    type: string
+    regexp: "\\W*"
+    unit: null
+
+  lpr_24h:
+    header: "AE2"
+    range: "AE3:AE30"
+    type: int
+    unit: Ohm

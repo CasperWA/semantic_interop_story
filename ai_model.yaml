@@ -3,12 +3,14 @@ description: AI model
 dimensions:
   N: Number of elements
 properties:
-  SMILES:
+  structure:
     type: string
     shape: ["N"]
-    description: SMILES
+    description: Atomic structure
+    unit: null
 
   inhibitorEfficiency:
     type: float
     shape: ["N"]
     description: EIS 24h
+    unit: null

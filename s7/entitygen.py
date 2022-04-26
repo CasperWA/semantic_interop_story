@@ -73,7 +73,15 @@ class SOFT7EntityProperty(BaseModel):
     shape: Optional[list[str]] = Field(
         None, description="List of dimensions making up the shape of the property."
     )
-    description: Optional[str] = Field(None, description="A description of the property.")
+    description: Optional[str] = Field(None, description="A human description of the property.")
+    unit: Optional[str] = Field(
+        None,
+        description=(
+            "The unit of the property. Would typically refer to other ontologies, like"
+            " EMMO, QUDT or OM, or simply be a conventional symbol for the unit (e.g. "
+            "'km/h'). In future releases unit may be changed to a class."
+        ),
+    )
 
 
 class SOFT7Entity(BaseModel):
