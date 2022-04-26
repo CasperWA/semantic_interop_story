@@ -30,7 +30,7 @@ class Graph:
         for s, p, o in g.triples((None, None, None)):
             self.append((s, p, o))
 
-    def path(self, origin: str, destination: str, predicate_filter: Optional[list[str]] = None) -> list[list[str]]:
+    def path(self, origin: str, destination: str, predicate_filter: Optional[list[str]] = None, node_avoidance_filter: Optional[list[str]] = None) -> list[list[str]]:
         # if link is None:
         #     link = [origin]
         # if visited is None:
@@ -52,10 +52,10 @@ class Graph:
         #         if dest == destination:
         #             return link
         #         return self.path(dest, destination, link, visited)
-        return [_ for _ in self.recur_find(origin, destination, predicate_filter)]
+        return [_ for _ in self.recur_find(origin, destination, predicate_filter, node_avoidance_filter)]
 
     def find(
-            self, origin: str, dest: str, predicate_filter: Optional[list[str]]  =None, visited: Optional[list[str]] = None
+            self, origin: str, dest: str, predicate_filter: Optional[list[str]] = None, node_avoidance_filter: Optional[list[str]] = None, visited: Optional[list[str]] = None
         ) -> tuple[list[str], list[str], bool]:
             if origin == dest:
                 visited.append(origin)
@@ -68,27 +68,31 @@ class Graph:
             for s, p, o in self.match(origin, None, None):   
                 if (
                     predicate_filter is None or p in predicate_filter
+                ) and (
+                    node_avoidance_filter is None or o not in node_avoidance_filter
                 ) and o not in visited:
                     to_visit.append(o)
 
             for s, p, o in self.match(None, None, origin):
                 if (
                     predicate_filter is None or p in predicate_filter
+                ) and (
+                    node_avoidance_filter is None or s not in node_avoidance_filter
                 ) and s not in visited:
                     to_visit.append(s)
 
             return to_visit, visited, False
 
     def recur_find(
-        self, origin: str, dest: str, predicate_filter: Optional[list[str]] = None, visited: Optional[list[str]] = None
+        self, origin: str, dest: str, predicate_filter: Optional[list[str]] = None, node_avoidance_filter: Optional[list[str]] = None, visited: Optional[list[str]] = None
     ) -> Generator[list[str], None, None]:
         if origin == dest:
             visited.append(origin)
             yield visited
         else:
-            to_visit, new_visited, found = self.find(origin, dest, predicate_filter, visited)
+            to_visit, new_visited, found = self.find(origin, dest, predicate_filter, node_avoidance_filter, visited)
             for p in to_visit:        
-                yield from self.recur_find(p, dest, predicate_filter, deepcopy(new_visited)) 
+                yield from self.recur_find(p, dest, predicate_filter, node_avoidance_filter, deepcopy(new_visited)) 
 
     def plot(self):
         """

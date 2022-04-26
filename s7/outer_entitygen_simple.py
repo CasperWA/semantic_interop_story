@@ -72,7 +72,7 @@ class SOFT7EntityPropertyType(str, Enum):
         }[self]
 
 
-def _get_inputs(name: str, graph: Graph) -> Optional[list[tuple[str, FunctionType, str]]]:
+def _get_inputs(name: str, graph: Graph) -> list[tuple[str, Optional[FunctionType], Optional[str]]]:
     """Retrieve all inputs/parameters for a function ONLY if it comes from internal entity."""
     expects = [
         expect for _, _, expect in graph.match(name, "expects", None)
@@ -91,7 +91,7 @@ def _get_inputs(name: str, graph: Graph) -> Optional[list[tuple[str, FunctionTyp
         inputs.extend(mapped_input)
     # print(inputs)
     if not inputs:
-        return None
+        return [(_, None, None) for _ in expects]
 
     input_getters = []
     for input_ in inputs:
@@ -118,10 +118,11 @@ def _get_property_local(
 ) -> Callable[[str], Any]:
     """Get a property - local."""
     predicate_filter = ["mapsTo", "outputs", "expects", "hasProperty"]
+    node_filter = ["outer"]
 
     def __get_property(name: str) -> Any:
-        path = graph.path(f"outer.{name}", "inner", predicate_filter)
-        # print(path)
+        path = graph.path(f"outer.{name}", "inner", predicate_filter, node_filter)
+        print(path)
         if len(path) > 1:
             raise RuntimeError("Found more than one path through the graph !")
         path = path[0]
@@ -148,7 +149,7 @@ def _get_property_local(
         res = None
         for function_name in reversed(functions):
             # print(function_name)
-            if functions_dict[function_name]["inputs"]:
+            if functions_dict[function_name]["inputs"][0][-1]:
                 res = functions_dict[function_name]["function"](
                     **{
                         param_name: getter_func(getter_func_param)
@@ -156,7 +157,12 @@ def _get_property_local(
                     }
                 )
             else:
-                res = functions_dict[function_name]["function"](res)
+                res = functions_dict[function_name]["function"](
+                    **{
+                        param_name: res
+                        for param_name, _, _ in functions_dict[function_name]["inputs"]
+                    }
+                )
             # print(res)
         return res
 
@@ -203,6 +209,12 @@ def create_outer_entity(
             "data model property names may not start with an underscore (_)"
         )
 
+    print("Knowledge Base")
+    display.display(Graph(TEST_KNOWLEDGE_BASE.triples).plot())
+
+    print("Knowledge Base + mapping")
+    display.display(Graph(mapping.triples + TEST_KNOWLEDGE_BASE.triples).plot())
+
     # Create "complete" local graph
     local_graph = Graph(
         [
@@ -215,20 +227,16 @@ def create_outer_entity(
     for s, p, o in mapping.triples:
         local_graph.append((s, p, o))
         split_subject = s.split(".")
-        if split_subject[0] == "inner":
-            for triple in [
-                (split_subject[0], "hasProperty", s),
-                (s, "get", lambda property_name: getattr(inner_entity, property_name)),
-            ]:
-                local_graph.append(triple)
+        for triple in [
+            (split_subject[0], "hasProperty", s),
+            (s, "get", lambda property_name: getattr(inner_entity, property_name)),
+        ]:
+            local_graph.append(triple)
 
     for triple in TEST_KNOWLEDGE_BASE.triples:
         local_graph.append(triple)
 
-    # Generate lambda functions for properties
-    # functions: list[str] = [
-    #     function_name for function_name, _, _ in mapping.match(p="isA", o="function")
-    # ]
+    # Generate (local) execution relations for functions
     for function_name, _, _ in local_graph.match(p="isA", o="function"):
         missing_functions = []
         if not hasattr(known_functions, function_name):
@@ -243,9 +251,10 @@ def create_outer_entity(
             )
         if missing_functions:
             raise ValueError(
-                f"{missing_functions} not found in known functions !"
+                f"{missing_functions} not found in known (local) functions !"
             )
 
+    print("Knowledge Base + mapping + derived (local) functions")
     display.display(local_graph.plot())
 
     return create_model(
