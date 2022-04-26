@@ -1,6 +1,7 @@
 from collections import defaultdict
+from copy import deepcopy
 import types
-from typing import Tuple, List, Any, Optional
+from typing import Tuple, List, Any, Optional, Generator
 from rdflib import Graph as RDFGraph
 from graphviz import Digraph
 
@@ -29,28 +30,71 @@ class Graph:
         for s, p, o in g.triples((None, None, None)):
             self.append((s, p, o))
 
-    def path(self, origin, destination, link=None, visited=None):
-        if link is None:
-            link = [origin]
-        if visited is None:
-            visited = []
+    def path(self, origin: str, destination: str, predicate_filter: Optional[list[str]] = None) -> list[list[str]]:
+        # if link is None:
+        #     link = [origin]
+        # if visited is None:
+        #     visited = []
+
+        # visited.append(origin)
+        # for _, _, dest in self.match(origin, None, None):
+        #     if not dest in visited:
+        #         link.append(dest)
+        #         print("forward", dest)
+        #         if dest == destination:
+        #             return link
+        #         return self.path(dest, destination, link, visited)
+
+        # for dest, _, _ in self.match(None, None, origin):
+        #     if not dest in visited:
+        #         link.append(dest)
+        #         print("reverse", dest)
+        #         if dest == destination:
+        #             return link
+        #         return self.path(dest, destination, link, visited)
+        return [_ for _ in self.recur_find(origin, destination, predicate_filter)]
+
+    def find(
+        self, origin: str, dest: str, predicate_filter: Optional[list[str]]  =None, visited: Optional[list[str]] = None
+    ) -> tuple[list[str], list[str], bool]:
+        if origin == dest:
+            visited.append(origin)
+            return [], visited, True
+        if not visited:
+            visited=[]
 
         visited.append(origin)
-        for _, _, dest in self.match(origin, None, None):
-            if not dest in visited:
-                link.append(dest)
-                print("forward", dest)
-                if dest == destination:
-                    return link
-                return self.path(dest, destination, link, visited)
+        to_visit = []    
+        for s, p, o in self.match(origin, None, None):            
+            if predicate_filter:
+                if p in predicate_filter:
+                    if o not in visited:
+                        to_visit.append(o)
+            else:
+                if o not in visited:
+                    to_visit.append(o)
 
-        for dest, _, _ in self.match(None, None, origin):
-            if not dest in visited:
-                link.append(dest)
-                print("reverse", dest)
-                if dest == destination:
-                    return link
-                return self.path(dest, destination, link, visited)
+        for s, p, o in self.match(None, None, origin):
+            if predicate_filter:
+                if p in predicate_filter:
+                    if s not in visited:
+                        to_visit.append(s)
+            else:
+                if s not in visited:
+                    to_visit.append(s)
+
+        return to_visit, visited, False
+
+    def recur_find(
+        self, origin: str, dest: str, predicate_filter: Optional[list[str]] = None, visited: Optional[list[str]] = None
+    ) -> Generator[list[str], None, None]:
+        if origin == dest:
+            visited.append(origin)
+            yield visited
+        else:
+            to_visit, new_visited, found = self.find(origin, dest, predicate_filter, visited)
+            for p in to_visit:        
+                yield from self.recur_find(p, dest, predicate_filter, deepcopy(new_visited)) 
 
     def plot(self):
         """

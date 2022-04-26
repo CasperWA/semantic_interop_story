@@ -6,13 +6,11 @@
 
 """
 from enum import Enum
-from functools import lru_cache
-import json
 from pathlib import Path
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, Union, Callable
 
+from IPython import display
 from oteapi.models import ResourceConfig
-from otelib import OTEClient
 from pydantic import create_model, Field
 import yaml
 
@@ -22,9 +20,12 @@ from .graph import Graph
 
 TEST_KNOWLEDGE_BASE = Graph(
     [
-        ("imp_to_flux", "isA", "function"),
-        ("imp_to_flux", "expects", "ImpedanceOhm"),
-        ("imp_to_flux", "outputs", "EISEfficiency"),
+        ("imp_to_eis", "isA", "function"),
+        ("imp_to_eis", "expects", "ImpedanceOhm"),
+        ("imp_to_eis", "outputs", "EISEfficiency"),
+        ("imp_to_lpr", "isA", "function"),
+        ("imp_to_lpr", "expects", "ImpedanceLogOhm"),
+        ("imp_to_lpr", "outputs", "LPREfficiency"),
         ("ImpedanceOhm", "isA", "Resistance"),
         ("ImpedanceLogOhm", "isA", "Resistance"),
         ("EISEfficiency", "isA", "InhibitorEfficiency"),
@@ -67,39 +68,66 @@ class SOFT7EntityPropertyType(str, Enum):
         }[self]
 
 
-@lru_cache
-def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] = None) -> Any:
-    """Get a property."""
-    client = OTEClient(url or "http://localhost:8080")
-    try:
-        data_resource = client.create_dataresource(**config.dict())
-    except Exception as exc:
-        raise AttributeError(f"{name!r} could not be determined") from exc
-    result: dict[str, Any] = json.loads(data_resource.get())
-    if name in result:
-        return result[name]
-    raise AttributeError(f"{name!r} could not be determined")
+def composite_functions(*func):
 
+    outer_func = func[0]
+
+    def composite(f, g):
+        return lambda x: f(g(x))
+
+    for function_ in func:
+        composite()
+    return [composite(outer_func, composite(_)) for _ in func[1:]]
 
 def _get_property_local(
     graph: Graph,
-) -> Any:
+) -> Callable[[str], Any]:
     """Get a property - local."""
-    # Not found in cache - go get property
-    # path = graph.path("")
+    predicate_filter = ["mapsTo", "outputs", "expects", "hasProperty"]
 
-    _temp_results = {
-        "SMILES": [function_ for _, _, function_ in graph.match(s="cas_to_smiles", p="executes")][0],
-        "inhibitorEfficiency": [function_ for _, _, function_ in graph.match(s="imp_to_flux", p="executes")][0]
-    }
-    _temp_paths = {
-        "SMILES": ["SMILES", "cas_to_smiles", "CAS#", "inner.casNumber"],
-        "inhibitorEfficiency": ["EISEfficiency", "imp_to_flux", "ImpedanceOhm", "inner.impedance_ohm_24h"],
-    }
+    def __get_property(name: str) -> Any:
+        path = graph.path(f"outer.{name}", "inner", predicate_filter)
+        print(path)
+        if len(path) > 1:
+            raise RuntimeError("Found more than one path through the graph !")
+        path = path[0]
 
-    def __get_property(name: str):
-        input_ = [function_ for _, _, function_ in graph.match(s=_temp_paths[name][-1], p="get")][0]
-        return _temp_results[name](input_(_temp_paths[name][-1].split(".")[-1]))
+        functions = [
+            _ for _ in path
+            if _ in [s for s, _, _ in graph.match(None, "isA", "function")]
+        ]
+        print(functions)
+
+        # callable_functions = 
+
+        if len(functions) > 1:
+            raise RuntimeError("Currently only supports running a single function, sorry.")
+
+        function_name = functions[0]
+
+        function_expects = [
+            expects for _, _, expects in graph.match(function_name, "expects", None)
+        ]
+        print(function_expects)
+
+        function_inputs: list[str] = []
+        for function_expect in function_expects:
+            function_input = [input_ for input_, _, _ in graph.match(None, "mapsTo", function_expect)]
+            if len(function_input) > 1:
+                raise RuntimeError(f"Expected exactly 1 mapping to {function_expect}, instead found {len(function_input)} !")
+            function_inputs.append(function_input[0])
+
+        print(function_inputs)
+
+        if len(function_inputs) > 1:
+            raise RuntimeError("Currently only supports functions with a single input, sorry.")
+
+        input_ = [
+            function_ for _, _, function_ in graph.match(function_inputs[0], "get", None)
+        ][0]
+        return [function_ for _, _, function_ in graph.match(function_name, "executes", None)][0](
+            input_(function_inputs[0].split(".")[-1])
+        )
 
     return __get_property
 
@@ -145,21 +173,23 @@ def create_outer_entity(
         )
 
     # Create "complete" local graph
-    # local_graph = Graph(
-    #     [
-    #         ("inner", "isA", "DataSourceEntity"),
-    #         ("outer", "isA", "OuterEntity"),
-    #         ("DataSourceEntity", "isA", "SOFT7DataEntity"),
-    #         ("OuterEntity", "isA", "SOFT7DataEntity"),
-    #     ]
-    # )
-    local_graph = Graph()
-    for s, _, _ in mapping.triples:
+    local_graph = Graph(
+        [
+            ("inner", "isA", "DataSourceEntity"),
+            ("outer", "isA", "OuterEntity"),
+            ("DataSourceEntity", "isA", "SOFT7DataEntity"),
+            ("OuterEntity", "isA", "SOFT7DataEntity"),
+        ]
+    )
+    for s, p, o in mapping.triples:
+        local_graph.append((s, p, o))
         split_subject = s.split(".")
         if split_subject[0] == "inner":
-            local_graph.append(
-                (s, "get", lambda name: getattr(inner_entity, name))
-            )
+            for triple in [
+                (split_subject[0], "hasProperty", s),
+                (s, "get", lambda property_name: getattr(inner_entity, property_name)),
+            ]:
+                local_graph.append(triple)
 
     for triple in TEST_KNOWLEDGE_BASE.triples:
         local_graph.append(triple)
@@ -184,6 +214,8 @@ def create_outer_entity(
             raise ValueError(
                 f"{missing_functions} not found in known functions !"
             )
+
+    display.display(local_graph.plot())
 
     return create_model(
         "OuterEntity",
