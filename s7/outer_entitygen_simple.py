@@ -7,7 +7,8 @@
 """
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable, Union, Callable
+from types import FunctionType
+from typing import Any, Iterable, Union, Callable, Optional
 
 from IPython import display
 from oteapi.models import ResourceConfig
@@ -26,6 +27,9 @@ TEST_KNOWLEDGE_BASE = Graph(
         ("imp_to_lpr", "isA", "function"),
         ("imp_to_lpr", "expects", "ImpedanceLogOhm"),
         ("imp_to_lpr", "outputs", "LPREfficiency"),
+        ("imp_log_func", "isA", "function"),
+        ("imp_log_func", "expects", "ImpedanceOhm"),
+        ("imp_log_func", "outputs", "ImpedanceLogOhm"),
         ("ImpedanceOhm", "isA", "Resistance"),
         ("ImpedanceLogOhm", "isA", "Resistance"),
         ("EISEfficiency", "isA", "InhibitorEfficiency"),
@@ -33,7 +37,7 @@ TEST_KNOWLEDGE_BASE = Graph(
         ("Resistance", "isA", "Parameter"),
         ("InhibitorEfficiency", "isA", "Output"),
         ("cas_to_smiles", "isA", "function"),
-        ("cas_to_smiles", "expects", "CAS#"),
+        ("cas_to_smiles", "expects", "CASNumber"),
         ("cas_to_smiles", "outputs", "SMILES"),
     ]
 )
@@ -68,16 +72,46 @@ class SOFT7EntityPropertyType(str, Enum):
         }[self]
 
 
-def composite_functions(*func):
+def _get_inputs(name: str, graph: Graph) -> Optional[list[tuple[str, FunctionType, str]]]:
+    """Retrieve all inputs/parameters for a function ONLY if it comes from internal entity."""
+    expects = [
+        expect for _, _, expect in graph.match(name, "expects", None)
+    ]
+    # print(expects)
 
-    outer_func = func[0]
+    inputs: list[str] = []
+    for expect in expects:
+        mapped_input = [
+            input_ for input_, _, _ in graph.match(None, "mapsTo", expect)
+        ]
+        if len(mapped_input) > 1:
+            raise RuntimeError(
+                f"Expected exactly 1 mapping to {expect}, instead found {len(mapped_input)} !"
+            )
+        inputs.extend(mapped_input)
+    # print(inputs)
+    if not inputs:
+        return None
 
-    def composite(f, g):
-        return lambda x: f(g(x))
+    input_getters = []
+    for input_ in inputs:
+        mapped_getter = [
+            function_ for _, _, function_ in graph.match(input_, "get", None)
+        ]
+        if len(mapped_getter) > 1:
+            raise RuntimeError(
+                f"Expected exactly 1 getter function for {input_!r}, instead found {len(mapped_getter)} !"
+            )
+        input_getters.append(mapped_getter[0])
 
-    for function_ in func:
-        composite()
-    return [composite(outer_func, composite(_)) for _ in func[1:]]
+    return list(
+        zip(
+            expects,
+            input_getters,
+            [input_.split(".")[-1] for input_ in inputs],
+        )
+    )
+
 
 def _get_property_local(
     graph: Graph,
@@ -87,7 +121,7 @@ def _get_property_local(
 
     def __get_property(name: str) -> Any:
         path = graph.path(f"outer.{name}", "inner", predicate_filter)
-        print(path)
+        # print(path)
         if len(path) > 1:
             raise RuntimeError("Found more than one path through the graph !")
         path = path[0]
@@ -96,38 +130,35 @@ def _get_property_local(
             _ for _ in path
             if _ in [s for s, _, _ in graph.match(None, "isA", "function")]
         ]
-        print(functions)
+        # print(functions)
 
-        # callable_functions = 
+        if not functions:
+            raise RuntimeError(f"No function found to retrieve {name!r}")
 
-        if len(functions) > 1:
-            raise RuntimeError("Currently only supports running a single function, sorry.")
+        functions_dict: dict[str, dict[str, Any]] = {}
+        for function_name in functions:
+            functions_dict[function_name] = {
+                "inputs": _get_inputs(function_name, graph),
+                "function": [
+                    function_
+                    for _, _, function_ in graph.match(function_name, "executes", None)
+                ][0],
+            }
 
-        function_name = functions[0]
-
-        function_expects = [
-            expects for _, _, expects in graph.match(function_name, "expects", None)
-        ]
-        print(function_expects)
-
-        function_inputs: list[str] = []
-        for function_expect in function_expects:
-            function_input = [input_ for input_, _, _ in graph.match(None, "mapsTo", function_expect)]
-            if len(function_input) > 1:
-                raise RuntimeError(f"Expected exactly 1 mapping to {function_expect}, instead found {len(function_input)} !")
-            function_inputs.append(function_input[0])
-
-        print(function_inputs)
-
-        if len(function_inputs) > 1:
-            raise RuntimeError("Currently only supports functions with a single input, sorry.")
-
-        input_ = [
-            function_ for _, _, function_ in graph.match(function_inputs[0], "get", None)
-        ][0]
-        return [function_ for _, _, function_ in graph.match(function_name, "executes", None)][0](
-            input_(function_inputs[0].split(".")[-1])
-        )
+        res = None
+        for function_name in reversed(functions):
+            # print(function_name)
+            if functions_dict[function_name]["inputs"]:
+                res = functions_dict[function_name]["function"](
+                    **{
+                        param_name: getter_func(getter_func_param)
+                        for param_name, getter_func, getter_func_param in functions_dict[function_name]["inputs"]
+                    }
+                )
+            else:
+                res = functions_dict[function_name]["function"](res)
+            # print(res)
+        return res
 
     return __get_property
 

@@ -55,35 +55,29 @@ class Graph:
         return [_ for _ in self.recur_find(origin, destination, predicate_filter)]
 
     def find(
-        self, origin: str, dest: str, predicate_filter: Optional[list[str]]  =None, visited: Optional[list[str]] = None
-    ) -> tuple[list[str], list[str], bool]:
-        if origin == dest:
-            visited.append(origin)
-            return [], visited, True
-        if not visited:
-            visited=[]
+            self, origin: str, dest: str, predicate_filter: Optional[list[str]]  =None, visited: Optional[list[str]] = None
+        ) -> tuple[list[str], list[str], bool]:
+            if origin == dest:
+                visited.append(origin)
+                return [], visited, True
+            if not visited:
+                visited=[]
 
-        visited.append(origin)
-        to_visit = []    
-        for s, p, o in self.match(origin, None, None):            
-            if predicate_filter:
-                if p in predicate_filter:
-                    if o not in visited:
-                        to_visit.append(o)
-            else:
-                if o not in visited:
+            visited.append(origin)
+            to_visit = []    
+            for s, p, o in self.match(origin, None, None):   
+                if (
+                    predicate_filter is None or p in predicate_filter
+                ) and o not in visited:
                     to_visit.append(o)
 
-        for s, p, o in self.match(None, None, origin):
-            if predicate_filter:
-                if p in predicate_filter:
-                    if s not in visited:
-                        to_visit.append(s)
-            else:
-                if s not in visited:
+            for s, p, o in self.match(None, None, origin):
+                if (
+                    predicate_filter is None or p in predicate_filter
+                ) and s not in visited:
                     to_visit.append(s)
 
-        return to_visit, visited, False
+            return to_visit, visited, False
 
     def recur_find(
         self, origin: str, dest: str, predicate_filter: Optional[list[str]] = None, visited: Optional[list[str]] = None
