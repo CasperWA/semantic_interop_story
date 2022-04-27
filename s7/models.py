@@ -1,9 +1,9 @@
 """Generic data model for configuration attributes."""
+from enum import Enum
 from pathlib import Path
-from types import FunctionType
-from typing import Any, ClassVar, Optional, Union
+from typing import Any, Optional, Union
 
-from pydantic import BaseModel, FileUrl, create_model, validator, PrivateAttr
+from pydantic import BaseModel, FileUrl, create_model, validator
 import yaml
 
 
@@ -42,6 +42,33 @@ def create_config(filename: Union[str, Path]) -> Workbook:
         ),
         __base__ = Workbook,
     )(**config)
+
+
+class SOFT7EntityPropertyType(str, Enum):
+    """Property type enumeration."""
+
+    STR = "string"
+    FLOAT = "float"
+    INT = "int"
+    COMPLEX = 'complex'
+    DICT = 'dict'
+    BOOLEAN = 'boolean'
+    BYTES = 'bytes'
+    BYTEARRAY = 'bytearray'
+
+    @property
+    def py_cls(self) -> type:
+        """Get the equivalent Python cls."""
+        return {
+            self.STR: str,
+            self.FLOAT: float,
+            self.INT: int,
+            self.COMPLEX: complex,
+            self.DICT: dict,
+            self.BOOLEAN: bool,
+            self.BYTES: bytes,
+            self.BYTEARRAY: bytearray,
+        }[self]
 
 
 class SOFT7DataEntity(BaseModel):

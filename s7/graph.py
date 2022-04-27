@@ -1,6 +1,4 @@
-from collections import defaultdict
 from copy import deepcopy
-import types
 from typing import Tuple, List, Any, Optional, Generator
 from rdflib import Graph as RDFGraph
 from graphviz import Digraph

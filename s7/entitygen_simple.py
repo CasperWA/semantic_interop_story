@@ -10,8 +10,6 @@ Parts 1 through 3 are provided through a single dictionary based on the
 `ResourceConfig` from `oteapi.models`.
 
 """
-from enum import Enum
-from functools import lru_cache
 import json
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -21,7 +19,7 @@ from otelib import OTEClient
 from pydantic import create_model, Field
 import yaml
 
-from .models import SOFT7DataEntity
+from .models import SOFT7DataEntity, SOFT7EntityPropertyType
 
 
 class HashableResourceConfig(ResourceConfig):
@@ -38,24 +36,6 @@ class HashableResourceConfig(ResourceConfig):
         )
 
 
-class SOFT7EntityPropertyType(str, Enum):
-    """Property type enumeration."""
-
-    STR = "string"
-    FLOAT = "float"
-    INT = "int"
-
-    @property
-    def py_cls(self) -> type:
-        """Get the equivalent Python cls."""
-        return {
-            self.STR: str,
-            self.FLOAT: float,
-            self.INT: int,
-        }[self]
-
-
-@lru_cache
 def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] = None) -> Any:
     """Get a property."""
     client = OTEClient(url or "http://localhost:8080")
@@ -68,7 +48,6 @@ def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] 
         return result[name]
     raise AttributeError(f"{name!r} could not be determined")
 
-# _CACHE = {}
 
 def _get_property_local(
     config: HashableResourceConfig,
@@ -76,16 +55,11 @@ def _get_property_local(
     """Get a property - local."""
     from s7.xlsparser import XLSParser
 
-    # global _CACHE
+    parser = XLSParser(config.configuration).get()
 
-    # if not _CACHE:
-    #     _CACHE = XLSParser(config.configuration).get()
-
-    _CACHE = XLSParser(config.configuration).get()
-
-    def __get_property_local(name: str):
-        if name in _CACHE:
-            return _CACHE[name]
+    def __get_property_local(name: str) -> Any:
+        if name in parser:
+            return parser[name]
 
         raise ValueError(f"Could find no data for {name!r}")
     return __get_property_local
@@ -136,7 +110,6 @@ def create_entity(
             property_name: (
                 SOFT7EntityPropertyType(property_value.get("type", "")).py_cls,
                 Field(
-                    # None,
                     default_factory=lambda: _get_property_local(resource_config),
                     description=property_value.get("description", ""),
                     title=property_name.replace(" ", "_"),

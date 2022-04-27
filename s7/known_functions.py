@@ -1,7 +1,6 @@
 from typing import Any, Iterable
 
 import math
-from numpy import log10
 
 
 def doubles(data: Iterable[Any]) -> list[Any]:

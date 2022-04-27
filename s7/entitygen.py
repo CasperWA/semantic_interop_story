@@ -10,11 +10,8 @@ Parts 1 through 3 are provided through a single dictionary based on the
 `ResourceConfig` from `oteapi.models`.
 
 """
-from enum import Enum
-from functools import lru_cache
 import json
 from pathlib import Path
-from types import FunctionType
 from typing import Any, Optional, Union
 
 from oteapi.models import ResourceConfig
@@ -22,15 +19,7 @@ from otelib import OTEClient
 from pydantic import AnyUrl, BaseModel, create_model, Field, validator
 import yaml
 
-
-class DataSourceEntityConfig:
-    """Pydantic configuration for 'DataSourceEntity'."""
-
-    extra = "forbid"
-    allow_mutation = False
-    frozen = True
-    validate_all = False
-    # arbitrary_types_allowed = True
+from .models import SOFT7DataEntity, SOFT7EntityPropertyType
 
 
 class HashableResourceConfig(ResourceConfig):
@@ -45,21 +34,6 @@ class HashableResourceConfig(ResourceConfig):
                 for field_name, field_value in self.__dict__.items()
             )
         )
-
-
-class SOFT7EntityPropertyType(str, Enum):
-    """Property type enumeration."""
-
-    STR = "string"
-    FLOAT = "float"
-
-    @property
-    def py_cls(self) -> type:
-        """Get the equivalent Python cls."""
-        return {
-            self.STR: str,
-            self.FLOAT: float,
-        }[self]
 
 
 class SOFT7EntityProperty(BaseModel):
@@ -134,7 +108,6 @@ class SOFT7Entity(BaseModel):
         return value
 
 
-@lru_cache
 def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] = None) -> Any:
     """Get a property."""
     client = OTEClient(url or "http://localhost:8080")
@@ -145,17 +118,20 @@ def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] 
     raise AttributeError(f"{name!r} could not be determined")
 
 
-def __getattribute(self, name: str) -> Any:
-    try:
-        res = object.__getattribute__(self, name)
-        if not name.startswith("_") and isinstance(res, FunctionType):
-            return res()
-        return res
-    except RecursionError:
-        try:
-            return object.__getattribute__(self, name)
-        except Exception:
-            raise AttributeError
+def _get_property_local(
+    config: HashableResourceConfig,
+) -> Any:
+    """Get a property - local."""
+    from s7.xlsparser import XLSParser
+
+    parser = XLSParser(config.configuration).get()
+
+    def __get_property_local(name: str) -> Any:
+        if name in parser:
+            return parser[name]
+
+        raise ValueError(f"Could find no data for {name!r}")
+    return __get_property_local
 
 
 def create_entity(
@@ -194,24 +170,24 @@ def create_entity(
     if any(property_name.startswith("_") for property_name in data_model.properties):
         raise ValueError("data model property names may not start with an underscore (_)")
 
-    DataSourceEntity = create_model(
+    return create_model(
         "DataSourceEntity",
         **{
             property_name: (
-                # Callable[[], property_value.type_.py_cls],
                 property_value.type_.py_cls,
                 Field(
-                    # lambda: _get_property(property_name, resource_config),
-                    default_factory=lambda: lambda: _get_property(property_name, resource_config),
+                    default_factory=lambda: _get_property_local(resource_config),
                     description=property_value.description or "",
                     title=property_name.replace(" ", "_"),
                     type=property_value.type_.py_cls,
+                    **{
+                        f"x-{field}": getattr(property_value, field)
+                        for field in property_value.__fields__
+                        if field not in ("description", "type_", "shape") and getattr(property_value, field)
+                    }
                 )
             ) for property_name, property_value in data_model.properties.items()
         },
         __module__ = __name__,
-        # __base__ = DynamicFieldValue,
-        __config__ = DataSourceEntityConfig,
+        __base__ = SOFT7DataEntity,
     )
-    DataSourceEntity.__getattribute__ = __getattribute
-    return DataSourceEntity
