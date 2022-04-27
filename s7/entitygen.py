@@ -16,96 +16,10 @@ from typing import Any, Optional, Union
 
 from oteapi.models import ResourceConfig
 from otelib import OTEClient
-from pydantic import AnyUrl, BaseModel, create_model, Field, validator
+from pydantic import BaseModel, create_model, Field, validator
 import yaml
 
-from .models import SOFT7DataEntity, SOFT7EntityPropertyType
-
-
-class HashableResourceConfig(ResourceConfig):
-    """ResourceConfig, but hashable."""
-
-    def __hash__(self) -> int:
-        return hash(
-            tuple(
-                (field_name, field_value)
-                if isinstance(field_value, (str, bytes, tuple, frozenset, int, float)) or field_value is None
-                else (field_name, None)
-                for field_name, field_value in self.__dict__.items()
-            )
-        )
-
-
-class SOFT7EntityProperty(BaseModel):
-    """A SOFT7 Entity property."""
-
-    type_: SOFT7EntityPropertyType = Field(
-        ...,
-        description="A valid property type.",
-        alias="type",
-    )
-    shape: Optional[list[str]] = Field(
-        None, description="List of dimensions making up the shape of the property."
-    )
-    description: Optional[str] = Field(None, description="A human description of the property.")
-    unit: Optional[str] = Field(
-        None,
-        description=(
-            "The unit of the property. Would typically refer to other ontologies, like"
-            " EMMO, QUDT or OM, or simply be a conventional symbol for the unit (e.g. "
-            "'km/h'). In future releases unit may be changed to a class."
-        ),
-    )
-
-
-class SOFT7Entity(BaseModel):
-    """A SOFT7 Entity."""
-
-    identity: AnyUrl = Field(..., description="The semantic reference for the entity.")
-    description: str = Field("", description="A description of the entity.")
-    dimensions: Optional[dict[str, str]] = Field(
-        None,
-        description=(
-            "A dictionary or model of dimension names (key) and descriptions "
-            "(value)."
-        ),
-    )
-    properties: dict[str, SOFT7EntityProperty] = Field(..., description="A dictionary of properties.")
-
-    @validator("properties")
-    def shapes_and_dimensions(
-        value: dict[str, SOFT7EntityProperty], values: dict[str, Any]
-    ) -> dict[str, SOFT7EntityProperty]:
-        """Ensure the shape values are dimensions keys."""
-        errors: list[tuple[str, str]] = []
-        if not values.get("dimensions", None):
-            for property_name, property_value in value.items():
-                if property_value.shape:
-                    errors.append(
-                        (
-                            property_name,
-                            "Cannot have shape; no dimensions are defined.",
-                        )
-                    )
-        else:
-            for property_name, property_value in value.items():
-                if property_value.shape and not all(
-                    dimension in values.get("dimensions", {})
-                    for dimension in property_value.shape
-                ):
-                    errors.append(
-                        (
-                            property_name,
-                            "Contains shape dimensions that are not defined in "
-                            "'dimensions'.",
-                        )
-                    )
-        if errors:
-            raise ValueError(
-                "Property shape(s) and dimensions don't match.\n"
-                + "\n".join(f"  {name}\n    {msg}" for name, msg in errors)
-            )
-        return value
+from .models import SOFT7DataEntity, HashableResourceConfig, SOFT7Entity
 
 
 def _get_property(name: str, config: HashableResourceConfig, url: Optional[str] = None) -> Any:
