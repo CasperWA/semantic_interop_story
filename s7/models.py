@@ -4,12 +4,12 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from oteapi.models import ResourceConfig
-from pydantic import BaseModel, FileUrl, create_model, validator, AnyUrl
+from pydantic import BaseModel, FileUrl, create_model, validator, AnyUrl, Field
 import yaml
 
 
 # XLS parser configuration
-class Field(BaseModel):
+class WorkbookField(BaseModel):
     header: str
     range: str
     type: str
@@ -37,7 +37,7 @@ def create_config(filename: Union[str, Path]) -> Workbook:
         "XLSConfig",
         data=(
             create_model(
-                "XLSConfigData", **{}.fromkeys(config["data"], (Field, ...))
+                "XLSConfigData", **{}.fromkeys(config["data"], (WorkbookField, ...))
             ),
             ...,
         ),

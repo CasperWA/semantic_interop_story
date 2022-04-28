@@ -16,7 +16,7 @@ from typing import Any, Optional, Union
 
 from oteapi.models import ResourceConfig
 from otelib import OTEClient
-from pydantic import BaseModel, create_model, Field, validator
+from pydantic import BaseModel, create_model, Field
 import yaml
 
 from .models import SOFT7DataEntity, HashableResourceConfig, SOFT7Entity
